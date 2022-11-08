@@ -1,0 +1,56 @@
+#include <esp_now.h>
+#include <WiFi.h>
+#define x_axis 32
+#define y_axis 33
+
+uint8_t mac_addr[] = {0x94, 0xE6, 0x86, 0x12, 0x29, 0xF8};
+uint8_t data[4];
+
+int x_axis_value;
+int y_axis_value;
+
+esp_now_peer_info_t peerInfo;
+
+void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
+  Serial.print("\r\nLast Packet Send Status:\t");
+  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+}
+ 
+void setup() {
+  Serial.begin(115200);
+ 
+  WiFi.mode(WIFI_STA); 
+    if (esp_now_init() != ESP_OK) { 
+    Serial.println("Error initializing ESP-NOW");
+    return;
+  }
+
+  esp_now_register_send_cb(OnDataSent);
+  memcpy(peerInfo.peer_addr, mac_addr, 6);
+  peerInfo.channel = 0;  
+  peerInfo.encrypt = false;   
+  if (esp_now_add_peer(&peerInfo) != ESP_OK){
+    Serial.println("Failed to add peer");
+    return;
+  }
+}
+ 
+void loop() {
+  int x_axis_value = analogRead(x_axis);
+  int y_axis_value = analogRead(y_axis);
+  data[0] = lowByte(x_axis_value);
+  data[1] = highByte(x_axis_value);
+  data[2] = lowByte(y_axis_value);
+  data[3] = highByte(y_axis_value);
+
+  esp_err_t result = esp_now_send(mac_addr, data, sizeof(data));
+   
+  if (result == ESP_OK) {
+    Serial.println("Sent with success");
+  }
+  else {
+    Serial.println("Error sending the data");
+  }
+ 
+  delay(100);//連続送信をすると、コールバックの順番がおかしくなる場合があるのでしばらく待機
+}
