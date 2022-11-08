@@ -1,0 +1,63 @@
+#include <esp_now.h>
+#include <WiFi.h>
+
+const int DIR  = 23;
+const int STEP = 22;
+const int ENABLE = 18;
+int x_axis_value, y_axis_value, rpm;
+
+void OnDataRecv(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
+  x_axis_value = makeWord(data[1],data[0]);
+  y_axis_value = makeWord(data[3],data[2]);
+  Serial.print("x_axis:");
+  Serial.print(x_axis_value);
+  Serial.print("  y_axis:");
+  Serial.println(y_axis_value); 
+}
+ 
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(DIR, OUTPUT);
+  pinMode(STEP, OUTPUT);
+  pinMode(ENABLE,OUTPUT);
+  digitalWrite(DIR, LOW);
+  digitalWrite(STEP, LOW);
+  digitalWrite(ENABLE, LOW);
+
+  WiFi.mode(WIFI_STA);
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("Error initializing ESP-NOW");
+    return;
+  }
+  esp_now_register_recv_cb(OnDataRecv);
+}
+ 
+void loop() {
+if (x_axis_value >2100){
+    rpm = map(x_axis_value, 2100, 4095, 2500, 65);
+    digitalWrite(DIR, HIGH);
+    digitalWrite(ENABLE, LOW);
+    drive();
+  }
+  if (x_axis_value < 1900){
+    rpm = map(x_axis_value, 1900, 0, 2500, 65);
+    digitalWrite(DIR, LOW);
+    digitalWrite(ENABLE, LOW);
+    drive();
+  }
+  else if(x_axis_value >=1900 && x_axis_value <= 2100){
+    rpm = 0;
+    digitalWrite(ENABLE, HIGH);
+    drive();
+  }
+}
+
+void drive() {
+  for (int i=0; i<100; i++) {
+    digitalWrite(STEP, HIGH);
+    delayMicroseconds(rpm);
+    digitalWrite(STEP, LOW);
+    delayMicroseconds(rpm);
+  }
+}
